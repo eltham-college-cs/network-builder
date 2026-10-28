@@ -164,7 +164,7 @@ svg#net{display:block;width:100%;height:auto;user-select:none;-webkit-user-selec
         </div>
       </div>
       <div class="canvas-box"><svg id="net" viewBox="0 0 960 540" role="img" aria-label="Network canvas">
-        <defs><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern></defs>
+        <defs><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" style="fill:none;stroke:var(--grid);stroke-width:1"/></pattern></defs>
         <rect width="960" height="540" fill="url(#g)"/>
         <g id="zoneLayer"></g><g id="ghostLayer"></g><g id="linkLayer"></g><line id="rubber" class="rubber" visibility="hidden"/><g id="devLayer"></g><g id="pkLayer"></g>
       </svg></div>
@@ -207,7 +207,7 @@ function icon(t){
     case 'router':return '<path class="ic-line" d="M-18 -6l-8 -22M18 -6l8 -22"/><rect class="ic-body" x="-34" y="-8" width="68" height="26" rx="6"/><circle class="ic-led" cx="-20" cy="5" r="3.5"/><circle class="ic-led" cx="-8" cy="5" r="3.5"/><circle class="ic-gold" cx="4" cy="5" r="3.5"/><path class="ic-line" d="M14 5h12"/>';
     case 'file':case 'print':case 'web':{const L={file:'F',print:'P',web:'W'}[t];
       return '<rect class="ic-body" x="-20" y="-32" width="40" height="56" rx="4"/><path class="ic-line" d="M-12 -18h24M-12 -8h24M-12 2h24"/><circle class="ic-led" cx="-10" cy="14" r="3"/><circle cx="18" cy="-30" r="12" class="ic-gold"/><text x="18" y="-25.5" style="font:800 13px system-ui;fill:#0A1B2E">'+L+'</text>';}
-    case 'printer':return '<rect x="-16" y="-30" width="32" height="20" fill="#fff" stroke="var(--dev-stroke)" stroke-width="2"/><rect class="ic-body" x="-30" y="-12" width="60" height="28" rx="4"/><rect x="-16" y="10" width="32" height="14" fill="#fff" stroke="var(--dev-stroke)" stroke-width="2"/><circle class="ic-led" cx="20" cy="-2" r="3"/>';
+    case 'printer':return '<rect x="-16" y="-30" width="32" height="20" style="fill:#fff;stroke:var(--dev-stroke);stroke-width:2"/><rect class="ic-body" x="-30" y="-12" width="60" height="28" rx="4"/><rect x="-16" y="10" width="32" height="14" style="fill:#fff;stroke:var(--dev-stroke);stroke-width:2"/><circle class="ic-led" cx="20" cy="-2" r="3"/>';
     case 'internet':return '<path class="ic-body" d="M-40 18c-14 0-18-20-4-24c-2-16 18-24 28-12c6-14 30-12 32 4c16-2 22 22 6 32z"/><path class="ic-line" d="M-18 6h36M0 -10v28" style="opacity:.5"/>';
   }
 }
@@ -388,14 +388,14 @@ function renderLog(cur){const box=$('log');if(!state.log.length){box.innerHTML='
 function inspect(p){$('inspector').innerHTML='<div class="packet"><div class="tag">Header</div><dl class="hd"><dt>From</dt><dd>'+p.from+'</dd><dt>To</dt><dd>'+p.to+'</dd><dt>Packet</dt><dd>'+p.n+' of '+p.of+'</dd><dt>Type</dt><dd>'+p.type+'</dd></dl><div class="tag data">Data</div><div class="pl">'+p.data+'</div></div>'+(p.lost?'<p class="empty" style="color:var(--bad)">This packet never arrived.</p>':'');}
 /* move one packet along a list of device ids. Returns {ok, link} */
 async function travel(route,meta,delay,opts){opts=opts||{};const s=S();if(!route)return{ok:false};if(delay)await sleep(delay);
-  const pk=el('g',{class:'pk'});pk.appendChild(el('circle',{r:11,fill:'var('+(meta.kind==='res'?'--pk-res':'--pk-req')+')'}));pk.appendChild(el('text',{},String(meta.n)));$('pkLayer').appendChild(pk);
+  const pk=el('g',{class:'pk'});pk.appendChild(el('circle',{r:11,style:'fill:var('+(meta.kind==='res'?'--pk-res':'--pk-req')+')'}));pk.appendChild(el('text',{},String(meta.n)));$('pkLayer').appendChild(pk);
   const rec=Object.assign({},meta);logPacket(rec);
   const speed=opts.speed||300;
   for(let i=0;i<route.length-1;i++){const A=dev(s,route[i]),B=dev(s,route[i+1]);const l=linkBetween(s,A.id,B.id);
     const stopHalf=(l&&l.broken)||(opts.loseAt===i);
     const tx=stopHalf?(A.x+B.x)/2:B.x,ty=stopHalf?(A.y+B.y)/2:B.y;const dist=Math.hypot(tx-A.x,ty-A.y);const dur=dist/speed*1000;
     await new Promise(res=>{const t0=performance.now();(function step(now){const k=Math.min(1,(now-t0)/dur);pk.setAttribute('transform','translate('+(A.x+(tx-A.x)*k)+','+(A.y+(ty-A.y)*k)+')');k<1?requestAnimationFrame(step):res();})(t0);});
-    if(stopHalf){pk.querySelector('circle').setAttribute('fill','var(--pk-lost)');pk.querySelector('text').textContent='✕';rec.lost=true;renderLog(rec);await sleep(900);pk.remove();return{ok:false,link:l};}}
+    if(stopHalf){pk.querySelector('circle').style.fill='var(--pk-lost)';pk.querySelector('text').textContent='✕';rec.lost=true;renderLog(rec);await sleep(900);pk.remove();return{ok:false,link:l};}}
   const last=document.querySelector('[data-dev="'+route[route.length-1]+'"]');if(last){last.classList.add('flash');setTimeout(()=>last.classList.remove('flash'),500);}
   pk.remove();return{ok:true};}
 function complete(text){state.done[state.m]=true;try{localStorage.setItem('nb-done',JSON.stringify(state.done));}catch(e){}state.busy=false;renderAll({text:text,tone:'ok'});}
