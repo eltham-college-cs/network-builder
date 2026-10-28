@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Network Builder</title>
+<meta name="description" content="Year 8 Computing, Eltham College: build a network, send packets, fix a broken cable and recover a lost packet.">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>
+/* Layout: navy header band, mission tabs, then mission card beside a full-width network canvas, packet inspector underneath. */
+:root{
+  --navy:#0A1B2E; --navy-2:#163351; --gold:#C89B3C; --gold-soft:#E3C783; --cream:#FDF1D9;
+  --bg:#F7F8FA; --panel:#FFFFFF; --line:#D7E3EF; --ink:#1A1D21; --muted:#56657A;
+  --canvas:#FBFCFE; --grid:#E6EDF5;
+  --dev-fill:#FFFFFF; --dev-stroke:#163351; --screen:#D7E3EF;
+  --eth:#2F5D8A; --fibre:#E08C14;
+  --ok:#1F7A4D; --ok-soft:#E6F4EC; --bad:#B4332B; --bad-soft:#FBE9E7;
+  --pk-req:#C89B3C; --pk-res:#1F7A4D; --pk-lost:#B4332B;
+  --display: Georgia, "Times New Roman", serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#08131F; --panel:#0F2236; --line:#23405F; --ink:#E8EEF5; --muted:#9FB2C8;
+  --canvas:#0C1C2D; --grid:#16304A; --dev-fill:#14304B; --dev-stroke:#D7E3EF; --screen:#2A5175;
+  --eth:#7FB2E5; --cream:#2B2412; --ok-soft:#123222; --bad-soft:#3A1714; --ok:#5CC48F; --bad:#F08A80; --pk-res:#3FB67A;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#08131F; --panel:#0F2236; --line:#23405F; --ink:#E8EEF5; --muted:#9FB2C8;
+  --canvas:#0C1C2D; --grid:#16304A; --dev-fill:#14304B; --dev-stroke:#D7E3EF; --screen:#2A5175;
+  --eth:#7FB2E5; --cream:#2B2412; --ok-soft:#123222; --bad-soft:#3A1714; --ok:#5CC48F; --bad:#F08A80; --pk-res:#3FB67A;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body)}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{background:#0A1B2E;color:#fff}
+header.top .wrap{padding-block:18px 16px;display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline;justify-content:space-between}
+.eyebrow{color:#E3C783;font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+h1{font:700 30px/1.1 var(--display);margin:2px 0 0;text-wrap:balance}
+.rule{height:3px;width:84px;background:var(--gold);margin-top:10px}
+.codes{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:#D7E3EF}
+.codes b{font-family:var(--mono);color:#0A1B2E;background:#E3C783;padding:2px 8px;border-radius:999px}
+nav.tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding-block:14px}
+.tab{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 10px;text-align:left;cursor:pointer;font:inherit;min-width:0}
+.tab .n{font:700 13px var(--body);color:var(--muted);display:flex;justify-content:space-between;gap:4px}
+.tab .t{font-size:14px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tab .st{color:var(--gold);letter-spacing:1px}
+.tab[aria-selected="true"]{border-color:var(--gold);box-shadow:inset 0 -3px 0 var(--gold)}
+.tab.done .n::after{content:"✓ done";color:var(--ok)}
+.tab:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+main.grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;padding-bottom:28px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.mission h2{font:700 24px/1.15 var(--display);margin:0 0 4px;text-wrap:balance}
+.stars{color:var(--gold);font-size:18px;letter-spacing:2px}
+.brief{margin:10px 0 12px}
+.label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 6px}
+ul.checks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+ul.checks li{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+ul.checks li .b{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:800;margin-top:1px}
+ul.checks li.ok .b{background:var(--ok);border-color:var(--ok);color:#fff}
+ul.checks li.ok{color:var(--muted)}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.btn{appearance:none;font:600 14px var(--body);border-radius:999px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.btn.primary{background:#0A1B2E;color:#fff;border-color:#0A1B2E}
+:root[data-theme="dark"] .btn.primary{background:var(--gold);color:#0A1B2E;border-color:var(--gold)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{background:var(--gold);color:#0A1B2E;border-color:var(--gold)}}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.status{margin-top:12px;border-radius:8px;padding:10px 12px;font-size:14px;background:var(--bg);border:1px solid var(--line)}
+.status.ok{background:var(--ok-soft);border-color:var(--ok)}
+.status.bad{background:var(--bad-soft);border-color:var(--bad)}
+.codeword{margin-top:12px;background:var(--cream);border:1px solid var(--gold);border-radius:8px;padding:12px;text-align:center;animation:pop .4s ease}
+.codeword .w{font:700 30px var(--mono);letter-spacing:.18em;color:var(--ink)}
+.codeword small{display:block;color:var(--muted)}
+@keyframes pop{from{transform:scale(.9);opacity:.3}to{transform:none;opacity:1}}
+.quiz{display:grid;gap:6px;margin-top:8px}
+.quiz button{text-align:left;border-radius:8px}
+.quiz button.right{background:var(--ok-soft);border-color:var(--ok)}
+.quiz button.wrong{background:var(--bad-soft);border-color:var(--bad)}
+.tiles{display:flex;gap:6px;margin-top:6px;min-height:40px;flex-wrap:wrap}
+.tile{width:40px;height:40px;border-radius:6px;display:grid;place-items:center;font:700 16px var(--mono);background:var(--pk-res);color:#fff;transition:transform .4s}
+.tile.miss{background:transparent;border:2px dashed var(--pk-lost);color:var(--pk-lost)}
+.stage{display:flex;flex-direction:column;gap:12px;min-width:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.group .gl{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-right:2px}
+.chip{appearance:none;font:600 13px var(--body);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:#0A1B2E;color:#fff;border-color:#0A1B2E}
+.chip .sw{width:18px;height:4px;border-radius:2px;display:inline-block}
+.canvas-box{border:1px solid var(--line);border-radius:10px;background:var(--canvas);overflow:hidden;touch-action:none}
+svg#net{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none}
+.ic-body{fill:var(--dev-fill);stroke:var(--dev-stroke);stroke-width:2.5}
+.ic-screen{fill:var(--screen)}
+.ic-line{stroke:var(--dev-stroke);stroke-width:2.5;fill:none;stroke-linecap:round}
+.ic-gold{fill:var(--gold)}
+.ic-led{fill:var(--ok)}
+.dev text{fill:var(--ink);font:600 14px var(--body);text-anchor:middle}
+.dev{cursor:grab}
+.dev.locked{cursor:default}
+.dev .halo{fill:none;stroke:transparent;stroke-width:3;stroke-dasharray:6 5}
+.dev.sel .halo{stroke:var(--gold)}
+.dev .hit{fill:transparent}
+.dev.flash .ic-body{stroke:var(--ok);stroke-width:4}
+.ghost rect{fill:none;stroke:var(--gold);stroke-width:2;stroke-dasharray:6 6;opacity:.8}
+.ghost text{fill:var(--muted);font:600 12px var(--body);text-anchor:middle}
+.lk-hit{stroke:transparent;stroke-width:22;cursor:pointer}
+.lk-eth{stroke:var(--eth);stroke-width:4;stroke-linecap:round}
+.lk-fibre{stroke:var(--fibre);stroke-width:6;stroke-linecap:round}
+.lk-pulse{stroke:#FFF7E0;stroke-width:2;stroke-dasharray:3 16;animation:pulse 1.1s linear infinite}
+@keyframes pulse{to{stroke-dashoffset:-19}}
+.lk-broken{stroke:var(--bad);stroke-width:4;stroke-dasharray:10 8}
+.lk-x{fill:var(--bad);font:800 22px var(--body);text-anchor:middle}
+.rubber{stroke:var(--gold);stroke-width:3;stroke-dasharray:6 6}
+.pk circle{stroke:#fff;stroke-width:2}
+.pk text{fill:#fff;font:800 11px var(--body);text-anchor:middle;dominant-baseline:central}
+.cloudzone{fill:var(--grid);opacity:.6}
+.zone-label{fill:var(--muted);font:700 13px var(--body);letter-spacing:.08em}
+.legend{font-size:13px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.packet{border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.packet .hd{margin:0;background:#0A1B2E;color:#D7E3EF;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px}
+.packet .hd dt{color:#E3C783;font-weight:700}
+.packet .hd dd{margin:0;font-family:var(--mono)}
+.packet .pl{background:var(--cream);padding:10px 12px;font-family:var(--mono);font-size:14px;color:var(--ink)}
+.packet .tag{font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:4px 12px;background:#163351;color:#E3C783}
+.packet .tag.data{background:var(--gold);color:#0A1B2E}
+.log{max-height:210px;overflow:auto;display:grid;gap:4px;font-size:13px}
+.log button{appearance:none;text-align:left;font:13px var(--mono);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:var(--ink);cursor:pointer;display:flex;gap:8px;align-items:center}
+.log button:hover,.log button.cur{border-color:var(--line);background:var(--bg)}
+.empty{color:var(--muted);font-size:14px}
+@media (max-width:960px){main.grid{grid-template-columns:1fr} nav.tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:620px){.lower{grid-template-columns:1fr} nav.tabs{grid-template-columns:repeat(2,minmax(0,1fr))} h1{font-size:24px}}
+@media (prefers-reduced-motion:reduce){.lk-pulse{animation:none}.codeword{animation:none}}
+</style>
+</head>
+<body>
+
+
+<header class="top"><div class="wrap">
+  <div>
+    <div class="eyebrow">Year 8 Computing · Eltham College · Networks lesson 1</div>
+    <h1>Network Builder</h1>
+    <div class="rule"></div>
+  </div>
+  <div class="codes" id="codes" aria-live="polite">Code words: <span>none yet</span></div>
+</div></header>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Missions"></nav>
+  <main class="grid">
+    <section class="card mission" id="mission" aria-live="polite"></section>
+    <section class="stage">
+      <div class="card" style="padding:12px">
+        <div class="toolbar" id="toolbar">
+          <div class="group" id="tools"><span class="gl">Tool</span>
+            <button class="chip" data-tool="move" aria-pressed="true">✋ Move</button>
+            <button class="chip" data-tool="eth" aria-pressed="false"><span class="sw" style="background:var(--eth)"></span>Ethernet cable</button>
+            <button class="chip" data-tool="fibre" aria-pressed="false"><span class="sw" style="background:var(--fibre)"></span>Fibre-optic cable</button>
+            <button class="chip" data-tool="del" aria-pressed="false">✕ Remove</button>
+          </div>
+          <div class="group" id="palette"><span class="gl">Add</span></div>
+        </div>
+      </div>
+      <div class="canvas-box"><svg id="net" viewBox="0 0 960 540" role="img" aria-label="Network canvas">
+        <defs><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern></defs>
+        <rect width="960" height="540" fill="url(#g)"/>
+        <g id="zoneLayer"></g><g id="ghostLayer"></g><g id="linkLayer"></g><line id="rubber" class="rubber" visibility="hidden"/><g id="devLayer"></g><g id="pkLayer"></g>
+      </svg></div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--pk-req)"></i>Request packet</span>
+        <span><i class="dot" style="background:var(--pk-res)"></i>Reply packet</span>
+        <span><i class="dot" style="background:var(--pk-lost)"></i>Lost packet</span>
+        <span>Ethernet = electrical signals · Fibre = light pulses</span>
+      </div>
+      <div class="lower">
+        <div class="card"><div class="label" style="margin-top:0">Inside a packet</div><div id="inspector"><p class="empty">Send something and the latest packet appears here. Click any row in the log to look inside it.</p></div></div>
+        <div class="card"><div class="label" style="margin-top:0">Packet log</div><div class="log" id="log"><p class="empty">No packets sent yet.</p></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg';
+const dc=e=>[...atob(e)].map(c=>String.fromCharCode(c.charCodeAt(0)^23)).reverse().join('');
+const TYPES={
+  pc:{name:'PC',client:true,add:'PC'},
+  laptop:{name:'Laptop',client:true,add:'Laptop'},
+  router:{name:'Router',add:'Router'},
+  file:{name:'File server',add:'File server'},
+  print:{name:'Print server',add:'Print server'},
+  printer:{name:'Printer',add:'Printer'},
+  internet:{name:'Internet'},
+  web:{name:'Web server'}
+};
+const isClient=d=>d&&TYPES[d.type].client;
+let uid=1;const nid=()=>'n'+(uid++);
+
+/* ---------- icons ---------- */
+function icon(t){
+  switch(t){
+    case 'pc':return '<rect class="ic-body" x="-28" y="-30" width="56" height="38" rx="4"/><rect class="ic-screen" x="-22" y="-25" width="44" height="28" rx="2"/><path class="ic-line" d="M0 8v10M-14 20h28"/>';
+    case 'laptop':return '<rect class="ic-body" x="-23" y="-28" width="46" height="32" rx="3"/><rect class="ic-screen" x="-18" y="-24" width="36" height="24" rx="2"/><path class="ic-body" d="M-32 6h64l-6 10h-52z"/>';
+    case 'router':return '<path class="ic-line" d="M-18 -6l-8 -22M18 -6l8 -22"/><rect class="ic-body" x="-34" y="-8" width="68" height="26" rx="6"/><circle class="ic-led" cx="-20" cy="5" r="3.5"/><circle class="ic-led" cx="-8" cy="5" r="3.5"/><circle class="ic-gold" cx="4" cy="5" r="3.5"/><path class="ic-line" d="M14 5h12"/>';
+    case 'file':case 'print':case 'web':{const L={file:'F',print:'P',web:'W'}[t];
+      return '<rect class="ic-body" x="-20" y="-32" width="40" height="56" rx="4"/><path class="ic-line" d="M-12 -18h24M-12 -8h24M-12 2h24"/><circle class="ic-led" cx="-10" cy="14" r="3"/><circle cx="18" cy="-30" r="12" class="ic-gold"/><text x="18" y="-25.5" style="font:800 13px system-ui;fill:#0A1B2E">'+L+'</text>';}
+    case 'printer':return '<rect x="-16" y="-30" width="32" height="20" fill="#fff" stroke="var(--dev-stroke)" stroke-width="2"/><rect class="ic-body" x="-30" y="-12" width="60" height="28" rx="4"/><rect x="-16" y="10" width="32" height="14" fill="#fff" stroke="var(--dev-stroke)" stroke-width="2"/><circle class="ic-led" cx="20" cy="-2" r="3"/>';
+    case 'internet':return '<path class="ic-body" d="M-40 18c-14 0-18-20-4-24c-2-16 18-24 28-12c6-14 30-12 32 4c16-2 22 22 6 32z"/><path class="ic-line" d="M-18 6h36M0 -10v28" style="opacity:.5"/>';
+  }
+}
+
+/* ---------- mission data ---------- */
+const P=(id,type,x,y,label,locked)=>({id,type,x,y,label,locked:!!locked});
+const L=(a,b,kind,extra)=>Object.assign({id:nid(),a,b,kind:kind||'eth'},extra||{});
+function m2Base(){return{devices:[P('r1','router',440,300,'Router'),P('c1','pc',190,150,'PC 1'),P('c2','pc',190,300,'PC 2'),P('c3','pc',190,450,'PC 3'),P('f1','file',440,110,'File server')],
+  links:[L('r1','c1'),L('r1','c2'),L('r1','c3'),L('r1','f1')]};}
+function m3Base(){const s=m2Base();s.devices.push(P('ps','print','700','390','Print server'),P('pr','printer',860,390,'Printer'),P('net','internet',740,130,'Internet',true),P('ws','web',890,130,'Web server',true));
+  s.devices.forEach(d=>{d.x=+d.x});s.links.push(L('r1','ps'),L('ps','pr'),L('net','ws','fibre',{locked:true}));return s;}
+const MISSIONS=[
+ {title:'Save your homework',short:'Save homework',stars:1,code:dc('Q15VRVg='),
+  brief:'Build a small school network. Three clients need to save their homework on the file server.',
+  palette:['pc','laptop','router','file'],action:'Send homework.docx',
+  starter:()=>({devices:[],links:[]}),
+  ghosts:[['router',460,280],['pc',200,130],['pc',200,280],['pc',200,430],['file',720,280]],
+  checks:[['A router',s=>count(s,'router')>=1],['3 clients (PCs or laptops)',s=>clients(s).length>=3],['A file server',s=>count(s,'file')>=1],
+    ['Every client cabled to the router',s=>clients(s).length>=3&&clients(s).every(c=>linkedTo(s,c,'router'))],['File server cabled to the router',s=>first(s,'file')&&linkedTo(s,first(s,'file'),'router')]],
+  run:runSave},
+ {title:'Print it',short:'Print it',stars:1,code:dc('Q0RWWEM='),
+  brief:'Printers are expensive, so the whole network shares one. Add a print server and a printer, then send a print job.',
+  palette:['pc','laptop','router','file','print','printer'],action:'Send print job',
+  starter:m2Base, ghosts:[['print',700,390],['printer',860,390]],
+  checks:[['A client cabled to the router',s=>clients(s).some(c=>linkedTo(s,c,'router'))],['A print server cabled to the router',s=>first(s,'print')&&linkedTo(s,first(s,'print'),'router')],['A printer cabled to the print server',s=>first(s,'printer')&&linkedTo(s,first(s,'printer'),'print')]],
+  run:runPrint},
+ {title:'Go online',short:'Go online',stars:2,code:dc('Q1JaWFQ='),
+  brief:'The school network is a LAN. To reach a website, the router must connect it to the internet. Long-distance links use fibre-optic cable.',
+  palette:['pc','laptop','router','file','print','printer'],action:'Load a web page',
+  starter:()=>{const s=m3Base();s.links=s.links.filter(l=>!(l.a==='ps'||l.b==='ps'||l.a==='pr'));s.devices=s.devices.filter(d=>d.id!=='ps'&&d.id!=='pr');return s;},
+  ghosts:[],
+  checks:[['A client cabled to the router',s=>clients(s).some(c=>linkedTo(s,c,'router'))],['Router connected to the internet',s=>!!routerNet(s)],['That link is fibre-optic (light pulses)',s=>routerNet(s)&&routerNet(s).kind==='fibre']],
+  run:runWeb},
+ {title:'Break it, fix it',short:'Break it, fix it',stars:2,code:dc('UltHVlo='),
+  brief:'Someone tripped over a cable. Everyone tries to save their work. Find out who can’t, find the fault and fix it.',
+  palette:[],action:'Everyone save work',
+  starter:()=>{const s=m3Base();s.links.push(L('r1','net','fibre'));const bad=s.links.find(l=>l.a==='r1'&&l.b==='c2');bad.broken=true;return s;},
+  ghosts:[],checks:[['Send everyone’s work',s=>S().sent],['Spot the faulty cable (it turns red)',s=>S().seen],['Replace it and send again',s=>S().fixed]],
+  run:runBreak},
+ {title:'The small office',short:'Small office',stars:3,code:dc('VkVVUk0='),
+  brief:'A small office needs a network. It must have 5 computers, a print server, a file server and a connection to the internet. Design it, then test it.',
+  palette:['pc','laptop','router','file','print','printer'],action:'Test my network',
+  starter:()=>({devices:[P('net','internet',780,110,'Internet',true),P('ws','web',905,110,'Web server',true)],links:[L('net','ws','fibre',{locked:true})]}),
+  ghosts:[['router',470,300],['pc',170,80],['pc',170,190],['pc',170,300],['pc',170,410],['pc',320,470],['file',470,110],['print',700,400],['printer',860,400]],
+  checks:[['5 computers (PCs or laptops)',s=>clients(s).length>=5],['Every computer cabled to the router',s=>clients(s).length>0&&clients(s).every(c=>linkedTo(s,c,'router'))],
+    ['File server cabled to the router',s=>first(s,'file')&&linkedTo(s,first(s,'file'),'router')],['Print server cabled to the router',s=>first(s,'print')&&linkedTo(s,first(s,'print'),'router')],
+    ['Router linked to the internet with fibre',s=>routerNet(s)&&routerNet(s).kind==='fibre'],['Bonus: a printer on the print server',s=>first(s,'printer')&&linkedTo(s,first(s,'printer'),'print'),true]],
+  run:runOffice},
+ {title:'Lost packet',short:'Lost packet',stars:3,code:dc('W1JPXkc='),
+  brief:'Extension. A web server sends you photo.jpg in 4 packets. Each packet finds its own way across the internet. Watch what arrives.',
+  palette:[],action:'Download photo.jpg',
+  starter:()=>({zone:true,devices:[P('c1','pc',90,300,'Your PC',true),P('h','router',240,300,'School router',true),P('a','router',440,150,'Router A',true),P('b','router',440,450,'Router B',true),P('c','router',650,150,'Router C',true),P('d','router',650,450,'Router D',true),P('ws','web',870,300,'Web server',true)],
+    links:['c1-h','h-a','h-b','a-c','b-d','a-d','b-c','c-ws','d-ws'].map(p=>{const [x,y]=p.split('-');return L(x,y,x==='c1'?'eth':'fibre',{locked:true});})}),
+  ghosts:[],checks:[['Download the photo',s=>S().sent],['Choose the packet to send again',s=>S().q1],['Explain the order they arrived in',s=>S().q2]],
+  run:runLost}
+];
+
+/* ---------- helpers ---------- */
+const count=(s,t)=>s.devices.filter(d=>d.type===t).length;
+const first=(s,t)=>s.devices.find(d=>d.type===t);
+const clients=s=>s.devices.filter(isClient);
+const dev=(s,id)=>s.devices.find(d=>d.id===id);
+const linkBetween=(s,a,b)=>s.links.find(l=>(l.a===a&&l.b===b)||(l.a===b&&l.b===a));
+function linkedTo(s,d,type){return s.links.some(l=>!l.broken&&((l.a===d.id&&dev(s,l.b).type===type)||(l.b===d.id&&dev(s,l.a).type===type)));}
+function routerNet(s){return s.links.find(l=>{const A=dev(s,l.a),B=dev(s,l.b);return(A.type==='router'&&B.type==='internet')||(B.type==='router'&&A.type==='internet');});}
+function path(s,a,b){const prev={[a]:null},q=[a];while(q.length){const c=q.shift();if(c===b)break;for(const l of s.links){const n=l.a===c?l.b:l.b===c?l.a:null;if(n&&!(n in prev)){prev[n]=c;q.push(n);}}}
+  if(!(b in prev))return null;const p=[];for(let c=b;c!==null;c=prev[c])p.unshift(c);return p;}
+
+/* ---------- state ---------- */
+const state={m:0,tool:'move',pending:null,busy:false,hint:false,boards:MISSIONS.map(m=>Object.assign({sent:false,seen:false,fixed:false,q1:false,q2:false},m.starter())),log:[],done:{}};
+try{state.done=JSON.parse(localStorage.getItem('nb-done')||'{}')||{};}catch(e){}
+const S=()=>state.boards[state.m];
+const M=()=>MISSIONS[state.m];
+
+/* ---------- rendering ---------- */
+const $=id=>document.getElementById(id);
+function el(tag,attrs,html){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(html!=null)e.innerHTML=html;return e;}
+function renderTabs(){const t=$('tabs');t.innerHTML='';MISSIONS.forEach((m,i)=>{const b=document.createElement('button');b.className='tab'+(state.done[i]?' done':'');b.setAttribute('role','tab');b.setAttribute('aria-selected',i===state.m);
+  b.innerHTML='<span class="n"><span>Mission '+(i+1)+' <span class="st">'+'★'.repeat(m.stars)+'</span></span></span><span class="t">'+m.short+'</span>';b.onclick=()=>{if(state.busy)return;state.m=i;state.pending=null;renderAll();};t.appendChild(b);});
+  const words=MISSIONS.map((m,i)=>state.done[i]?'<b>'+(i+1)+' '+m.code+'</b>':'').filter(Boolean);
+  $('codes').innerHTML='Code words: '+(words.length?words.join(''):'<span>none yet</span>');}
+function renderMission(msg){
+  const m=M(),s=S(),box=$('mission');
+  const checks=m.checks.map(([label,fn,bonus])=>{let ok=false;try{ok=!!fn(s);}catch(e){}return'<li class="'+(ok?'ok':'')+'"><span class="b">'+(ok?'✓':'')+'</span><span>'+label+'</span></li>';}).join('');
+  let h='<div class="eyebrow" style="color:var(--muted)">Mission '+(state.m+1)+' of 6</div><h2>'+m.title+'</h2><div class="stars" aria-label="'+m.stars+' stars">'+'★'.repeat(m.stars)+'<span style="color:var(--line)">'+'★'.repeat(3-m.stars)+'</span></div><p class="brief">'+m.brief+'</p>';
+  if(m.palette.length)h+='<div class="label">How to build</div><p style="margin:0;font-size:14px">Use <b>Add</b> to place devices and drag them into position. Choose a <b>cable</b>, then click one device and then another to connect them.</p>';
+  h+='<div class="label">Checklist</div><ul class="checks">'+checks+'</ul>';
+  h+='<div class="btnrow"><button class="btn primary" id="go"'+(state.busy?' disabled':'')+'>▶ '+m.action+'</button>';
+  if(m.ghosts.length)h+='<button class="btn" id="hint" aria-pressed="'+state.hint+'">'+(state.hint?'Hide':'Show')+' layout hint</button>';
+  if(state.m!==5)h+='<button class="btn" id="reset">Start again</button>';
+  h+='</div>';
+  if(state.m===5)h+=lostPanel();
+  h+='<div class="status '+(msg&&msg.tone||'')+'" id="status">'+(msg?msg.text:defaultTip())+'</div>';
+  if(state.done[state.m])h+='<div class="codeword"><small>Mission complete. Write this code word in your book.</small><div class="w">'+m.code+'</div></div>';
+  box.innerHTML=h;
+  $('go').onclick=()=>{if(!state.busy)m.run();};
+  if($('hint'))$('hint').onclick=()=>{state.hint=!state.hint;renderAll();};
+  if($('reset'))$('reset').onclick=()=>{if(state.busy)return;state.boards[state.m]=Object.assign({sent:false,seen:false,fixed:false,q1:false,q2:false},m.starter());renderAll();};
+  if(state.m===5)wireLost();
+}
+function defaultTip(){return['Start with the router in the middle. Everything else connects to it.','Connect the print server to the router, then plug the printer into the print server.','Pick the fibre-optic cable, then click the router and then the Internet cloud.','Press the button and watch which packets get through.','Check every line of the brief before you press Test.','Press Download and watch each packet.'][state.m];}
+function setStatus(text,tone){const st=$('status');if(st){st.className='status '+(tone||'');st.innerHTML=text;}}
+function renderPalette(){const p=$('palette');p.innerHTML='<span class="gl">Add</span>';const m=M();
+  m.palette.forEach(t=>{const b=document.createElement('button');b.className='chip';b.textContent='+ '+TYPES[t].add;b.onclick=()=>addDevice(t);p.appendChild(b);});
+  p.hidden=!m.palette.length;$('tools').hidden=!m.palette.length&&state.m!==3;
+  if(state.m===3){[...$('tools').querySelectorAll('[data-tool]')].forEach(b=>b.hidden=!(b.dataset.tool==='move'||b.dataset.tool==='eth'||b.dataset.tool==='del'));}
+  else [...$('tools').querySelectorAll('[data-tool]')].forEach(b=>b.hidden=false);
+  [...$('tools').querySelectorAll('[data-tool]')].forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===state.tool));}
+function renderCanvas(){const s=S();
+  const z=$('zoneLayer');z.innerHTML='';
+  if(s.zone){z.appendChild(el('rect',{x:345,y:60,width:400,height:440,rx:40,class:'cloudzone'}));z.appendChild(el('text',{x:545,y:90,'text-anchor':'middle',class:'zone-label'},'THE INTERNET (WAN)'));
+    z.appendChild(el('text',{x:165,y:90,'text-anchor':'middle',class:'zone-label'},'SCHOOL (LAN)'));}
+  const g=$('ghostLayer');g.innerHTML='';
+  if(state.hint)M().ghosts.forEach(([t,x,y])=>{const gg=el('g',{class:'ghost',transform:'translate('+x+','+y+')'});gg.appendChild(el('rect',{x:-44,y:-40,width:88,height:96,rx:10}));gg.appendChild(el('text',{y:72},TYPES[t].name));g.appendChild(gg);});
+  const lk=$('linkLayer');lk.innerHTML='';
+  s.links.forEach(l=>{const A=dev(s,l.a),B=dev(s,l.b);const a={x1:A.x,y1:A.y,x2:B.x,y2:B.y};
+    const gg=el('g',{'data-link':l.id});
+    if(l.broken&&l.revealed){gg.appendChild(el('line',Object.assign({class:'lk-broken'},a)));gg.appendChild(el('text',{x:(A.x+B.x)/2,y:(A.y+B.y)/2+8,class:'lk-x'},'✕'));}
+    else if(l.kind==='fibre'){gg.appendChild(el('line',Object.assign({class:'lk-fibre'},a)));gg.appendChild(el('line',Object.assign({class:'lk-pulse'},a)));}
+    else gg.appendChild(el('line',Object.assign({class:'lk-eth'},a)));
+    gg.appendChild(el('line',Object.assign({class:'lk-hit'},a)));lk.appendChild(gg);});
+  const dl=$('devLayer');dl.innerHTML='';
+  s.devices.forEach(d=>{const gg=el('g',{class:'dev'+(d.locked?' locked':'')+(state.pending===d.id?' sel':''),'data-dev':d.id,transform:'translate('+d.x+','+d.y+')'});
+    gg.appendChild(el('circle',{class:'halo',r:50}));gg.appendChild(el('rect',{class:'hit',x:-44,y:-40,width:88,height:100}));
+    gg.insertAdjacentHTML('beforeend',icon(d.type));gg.appendChild(el('text',{y:d.type==='internet'?44:50},d.label));dl.appendChild(gg);});}
+function renderAll(msg){renderTabs();renderPalette();renderCanvas();renderMission(msg);}
+
+/* ---------- editing ---------- */
+function labelFor(s,t){const base=TYPES[t].name;if(t==='pc'||t==='laptop'){let n=1;while(s.devices.some(d=>d.label===base+' '+n))n++;return base+' '+n;}
+  if(!s.devices.some(d=>d.label===base))return base;let n=2;while(s.devices.some(d=>d.label===base+' '+n))n++;return base+' '+n;}
+function addDevice(t){if(state.busy)return;const s=S();if(s.devices.length>=16){setStatus('That’s plenty of devices for this mission. Remove one first.','bad');return;}
+  const spots=[];for(let y=90;y<=470;y+=95)for(let x=110;x<=850;x+=105)spots.push([x,y]);
+  const spot=spots.find(([x,y])=>s.devices.every(d=>Math.hypot(d.x-x,d.y-y)>95))||[480,270];
+  s.devices.push(P(nid(),t,spot[0],spot[1],labelFor(s,t)));renderAll({text:'Added a '+TYPES[t].name.toLowerCase()+'. Drag it into place, then cable it up.'});}
+function ruleError(A,B){const t=new Set([A.type,B.type]);
+  if(A===B)return'Pick a different device for the other end.';
+  if(t.has('web'))return'The web server lives out on the internet. It is already connected to the Internet cloud.';
+  if(t.has('internet'))return t.has('router')?null:'Only a router can connect a network to the internet.';
+  if(t.has('printer'))return t.has('print')?null:'Plug the printer into the print server. The print server manages the print jobs.';
+  if(t.has('router'))return null;
+  if(isClient(A)&&isClient(B))return'Connect computers to the router, not to each other. The router directs the data.';
+  return'Connect this to the router. The router directs data around the network.';}
+function tryLink(aId,bId){const s=S(),A=dev(s,aId),B=dev(s,bId);const err=ruleError(A,B);if(err){renderCanvas();setStatus(err,'bad');return;}
+  if(linkBetween(s,aId,bId)){renderCanvas();setStatus('Those two are already connected.','bad');return;}
+  s.links.push(L(aId,bId,state.tool==='fibre'?'fibre':'eth'));
+  const kind=state.tool==='fibre'?'Fibre-optic cable (light pulses)':'Ethernet cable (electrical signals)';
+  renderAll({text:kind+' connects '+A.label+' to '+B.label+'.',tone:'ok'});}
+
+document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{state.tool=b.dataset.tool;state.pending=null;renderAll();});
+const svg=$('net');
+function pt(e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
+let drag=null;
+svg.addEventListener('pointerdown',e=>{if(state.busy||state.m===5)return;const s=S();
+  const dg=e.target.closest('[data-dev]'),lg=e.target.closest('[data-link]');
+  if(dg){const d=dev(s,dg.dataset.dev);
+    if(state.tool==='move'){if(d.locked)return;const p=pt(e);drag={d,dx:d.x-p.x,dy:d.y-p.y};svg.setPointerCapture(e.pointerId);return;}
+    if(state.tool==='del'){if(d.locked){setStatus(d.label+' is part of the mission and stays put.','bad');return;}
+      s.devices=s.devices.filter(x=>x!==d);s.links=s.links.filter(l=>l.a!==d.id&&l.b!==d.id);renderAll({text:'Removed '+d.label+'.'});return;}
+    if(!state.pending){state.pending=d.id;renderCanvas();setStatus('Now click the device at the other end of the cable.');return;}
+    const a=state.pending;state.pending=null;$('rubber').setAttribute('visibility','hidden');if(a===d.id){renderCanvas();return;}tryLink(a,d.id);return;}
+  if(lg){const l=s.links.find(x=>x.id===lg.dataset.link);
+    if(l.broken&&l.revealed){l.broken=false;l.revealed=false;s.fixed=false;s.repaired=true;renderAll({text:'Cable replaced. Send everyone’s work again to check.',tone:'ok'});return;}
+    if(state.tool==='del'){if(l.locked){setStatus('That link is part of the mission and stays put.','bad');return;}s.links=s.links.filter(x=>x!==l);renderAll({text:'Cable removed.'});return;}}
+  if(state.pending){state.pending=null;$('rubber').setAttribute('visibility','hidden');renderCanvas();}});
+svg.addEventListener('pointermove',e=>{const p=pt(e);
+  if(drag){drag.d.x=Math.max(50,Math.min(910,p.x+drag.dx));drag.d.y=Math.max(50,Math.min(480,p.y+drag.dy));renderCanvas();return;}
+  if(state.pending){const d=dev(S(),state.pending);const r=$('rubber');r.setAttribute('x1',d.x);r.setAttribute('y1',d.y);r.setAttribute('x2',p.x);r.setAttribute('y2',p.y);r.setAttribute('visibility','visible');}});
+const endDrag=()=>{if(drag){drag=null;renderMission();}};
+svg.addEventListener('pointerup',endDrag);svg.addEventListener('pointercancel',endDrag);
+
+/* ---------- packets ---------- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function logPacket(p){state.log.unshift(p);if(state.log.length>40)state.log.pop();renderLog(p);}
+function renderLog(cur){const box=$('log');if(!state.log.length){box.innerHTML='<p class="empty">No packets sent yet.</p>';return;}box.innerHTML='';
+  state.log.forEach(p=>{const b=document.createElement('button');b.className=p===cur?'cur':'';
+    b.innerHTML='<i class="dot" style="background:var('+(p.lost?'--pk-lost':p.kind==='res'?'--pk-res':'--pk-req')+')"></i>'+p.from+' → '+p.to+' · '+p.n+'/'+p.of+(p.lost?' · lost':'');
+    b.onclick=()=>{renderLog(p);};box.appendChild(b);});inspect(cur||state.log[0]);}
+function inspect(p){$('inspector').innerHTML='<div class="packet"><div class="tag">Header</div><dl class="hd"><dt>From</dt><dd>'+p.from+'</dd><dt>To</dt><dd>'+p.to+'</dd><dt>Packet</dt><dd>'+p.n+' of '+p.of+'</dd><dt>Type</dt><dd>'+p.type+'</dd></dl><div class="tag data">Data</div><div class="pl">'+p.data+'</div></div>'+(p.lost?'<p class="empty" style="color:var(--bad)">This packet never arrived.</p>':'');}
+/* move one packet along a list of device ids. Returns {ok, link} */
+async function travel(route,meta,delay,opts){opts=opts||{};const s=S();if(!route)return{ok:false};if(delay)await sleep(delay);
+  const pk=el('g',{class:'pk'});pk.appendChild(el('circle',{r:11,fill:'var('+(meta.kind==='res'?'--pk-res':'--pk-req')+')'}));pk.appendChild(el('text',{},String(meta.n)));$('pkLayer').appendChild(pk);
+  const rec=Object.assign({},meta);logPacket(rec);
+  const speed=opts.speed||300;
+  for(let i=0;i<route.length-1;i++){const A=dev(s,route[i]),B=dev(s,route[i+1]);const l=linkBetween(s,A.id,B.id);
+    const stopHalf=(l&&l.broken)||(opts.loseAt===i);
+    const tx=stopHalf?(A.x+B.x)/2:B.x,ty=stopHalf?(A.y+B.y)/2:B.y;const dist=Math.hypot(tx-A.x,ty-A.y);const dur=dist/speed*1000;
+    await new Promise(res=>{const t0=performance.now();(function step(now){const k=Math.min(1,(now-t0)/dur);pk.setAttribute('transform','translate('+(A.x+(tx-A.x)*k)+','+(A.y+(ty-A.y)*k)+')');k<1?requestAnimationFrame(step):res();})(t0);});
+    if(stopHalf){pk.querySelector('circle').setAttribute('fill','var(--pk-lost)');pk.querySelector('text').textContent='✕';rec.lost=true;renderLog(rec);await sleep(900);pk.remove();return{ok:false,link:l};}}
+  const last=document.querySelector('[data-dev="'+route[route.length-1]+'"]');if(last){last.classList.add('flash');setTimeout(()=>last.classList.remove('flash'),500);}
+  pk.remove();return{ok:true};}
+function complete(text){state.done[state.m]=true;try{localStorage.setItem('nb-done',JSON.stringify(state.done));}catch(e){}state.busy=false;renderAll({text:text,tone:'ok'});}
+function failChecks(){const s=S();const miss=M().checks.find(([l,fn,bonus])=>{if(bonus)return false;try{return!fn(s);}catch(e){return true;}});if(miss){setStatus('Not ready yet: <b>'+miss[0]+'</b>.','bad');return true;}return false;}
+async function begin(){state.busy=true;state.pending=null;renderMission();}
+function finish(msg){state.busy=false;renderAll(msg);}
+
+async function runSave(){if(failChecks())return;await begin();const s=S(),f=first(s,'file');const cs=clients(s).filter(c=>linkedTo(s,c,'router'));
+  setStatus('Each client splits homework.docx into 2 packets and sends them to the file server…');
+  await Promise.all(cs.map((c,i)=>Promise.all([1,2].map(n=>travel(path(s,c.id,f.id),{from:c.label,to:f.label,n,of:2,type:'Save file',data:n===1?'homework.docx · part 1: “Networks let us share…”':'homework.docx · part 2: “…files and printers.”',kind:'req'},i*500+(n-1)*260)))));
+  setStatus('The file server stores the files and replies to each client…');
+  await Promise.all(cs.map((c,i)=>travel(path(s,f.id,c.id),{from:f.label,to:c.label,n:1,of:1,type:'Reply',data:'Saved ✓ homework.docx',kind:'res'},i*300)));
+  complete('All '+cs.length+' clients saved their homework. The <b>clients</b> sent requests and the <b>server</b> provided the service.');}
+async function runPrint(){if(failChecks())return;await begin();const s=S(),c=clients(s).find(c=>linkedTo(s,c,'router')),ps=first(s,'print'),pr=first(s,'printer');
+  setStatus(c.label+' sends the print job to the print server…');
+  await Promise.all([1,2,3].map(n=>travel(path(s,c.id,ps.id),{from:c.label,to:ps.label,n,of:3,type:'Print job',data:'poster.pdf · page '+n,kind:'req'},(n-1)*300)));
+  setStatus('The print server queues the job and sends it to the printer…');
+  await Promise.all([1,2,3].map(n=>travel(path(s,ps.id,pr.id),{from:ps.label,to:pr.label,n,of:3,type:'Print',data:'poster.pdf · page '+n,kind:'req'},(n-1)*300)));
+  await travel(path(s,ps.id,c.id),{from:ps.label,to:c.label,n:1,of:1,type:'Reply',data:'Printed ✓ 3 pages',kind:'res'});
+  complete('Printed. Every computer shares <b>one</b> printer through the print server, which saves money and space.');}
+async function runWeb(){if(failChecks())return;await begin();const s=S(),c=clients(s).find(c=>linkedTo(s,c,'router')),ws=first(s,'web');
+  setStatus(c.label+' asks the web server for a page. The router sends the request out of the LAN…');
+  await travel(path(s,c.id,ws.id),{from:c.label,to:ws.label,n:1,of:1,type:'Request',data:'GET /index.html',kind:'req'});
+  setStatus('The web server sends the page back in 3 packets…');
+  await Promise.all([1,2,3].map(n=>travel(path(s,ws.id,c.id),{from:ws.label,to:c.label,n,of:3,type:'Web page',data:'index.html · part '+n+' of 3',kind:'res'},(n-1)*280)));
+  complete('Page loaded. The <b>router</b> connected the school LAN to the internet, and the fibre link carried the data as light.');}
+async function runBreak(){await begin();const s=S(),f=first(s,'file');const cs=clients(s);s.sent=true;
+  setStatus('Everyone sends their work to the file server…');
+  const res=await Promise.all(cs.map((c,i)=>{const p=path(s,c.id,f.id);return p?travel(p,{from:c.label,to:f.label,n:1,of:1,type:'Save file',data:'classwork.docx',kind:'req'},i*400).then(r=>({c,r})):Promise.resolve({c,r:{ok:false}});}));
+  const failed=res.filter(x=>!x.r.ok);
+  if(failed.length){const bad=s.links.filter(l=>l.broken);bad.forEach(l=>l.revealed=true);s.seen=true;
+    finish({text:'<b>'+failed.map(x=>x.c.label).join(', ')+'</b> could not save. The packet was lost on the way. The faulty cable is now red. <b>Click it to replace it</b>, then send again.',tone:'bad'});return;}
+  if(s.seen||s.repaired){s.fixed=true;complete('Every packet arrived. One broken cable cut a client off from the file server. Every connection matters.');return;}
+  finish({text:'Everything arrived.'});}
+async function runOffice(){if(failChecks())return;await begin();const s=S(),f=first(s,'file'),ps=first(s,'print'),ws=first(s,'web');const cs=clients(s);
+  setStatus('Test 1 of 3: every computer saves a file…');
+  await Promise.all(cs.map((c,i)=>travel(path(s,c.id,f.id),{from:c.label,to:f.label,n:1,of:1,type:'Save file',data:'report.docx',kind:'req'},i*200)));
+  setStatus('Test 2 of 3: '+cs[0].label+' prints…');
+  await travel(path(s,cs[0].id,ps.id),{from:cs[0].label,to:ps.label,n:1,of:1,type:'Print job',data:'invoice.pdf',kind:'req'});
+  const pr=first(s,'printer');if(pr&&linkedTo(s,pr,'print'))await travel(path(s,ps.id,pr.id),{from:ps.label,to:pr.label,n:1,of:1,type:'Print',data:'invoice.pdf',kind:'req'});
+  setStatus('Test 3 of 3: '+cs[cs.length-1].label+' loads a web page…');
+  const c=cs[cs.length-1];await travel(path(s,c.id,ws.id),{from:c.label,to:ws.label,n:1,of:1,type:'Request',data:'GET /index.html',kind:'req'});
+  await travel(path(s,ws.id,c.id),{from:ws.label,to:c.label,n:1,of:1,type:'Web page',data:'index.html',kind:'res'});
+  complete('Your office network passes all three tests. Can you explain why each device is needed?');}
+
+/* ---------- mission 6 ---------- */
+const lost={arrived:[],resent:false,answer1:null,answer2:null};
+function lostPanel(){const s=S();let h='<div class="label">Packets received by Your PC</div><div class="tiles" id="tiles">';
+  const shown=lost.resent?[1,2,3,4]:lost.arrived;
+  if(!shown.length)h+='<span class="empty">Nothing yet.</span>';
+  shown.forEach(n=>h+='<div class="tile">'+n+'</div>');
+  if(lost.arrived.length&&!lost.resent)h+='<div class="tile miss">?</div>';
+  h+='</div>';
+  if(s.sent&&!s.q1){h+='<div class="label">Question 1</div><p style="margin:0">The PC checks the packet numbers. Which packet must the server send again?</p><div class="quiz" id="q1">'+[1,2,3,4].map(n=>'<button class="btn" data-a="'+n+'">Packet '+n+'</button>').join('')+'</div>';}
+  if(s.q1&&!s.q2){h+='<div class="label">Question 2</div><p style="margin:0">Packet 2 arrived before packet 1. Why?</p><div class="quiz" id="q2">'+
+    [['a','Packet 2 was smaller'],['b','Each packet can take a different route, and packet 2’s route was quicker'],['c','The router sorted the packets into the wrong order']].map(([k,t])=>'<button class="btn" data-a="'+k+'">'+t+'</button>').join('')+'</div>';}
+  return h;}
+function wireLost(){const q1=$('q1'),q2=$('q2');
+  if(q1)q1.querySelectorAll('button').forEach(b=>b.onclick=async()=>{if(state.busy)return;if(b.dataset.a!=='3'){b.classList.add('wrong');setStatus('Packet '+b.dataset.a+' arrived. Look at the numbers again.','bad');return;}
+    b.classList.add('right');await begin();setStatus('Right. The PC asks for packet 3 again, and the server resends it…');
+    await travel(['ws','c','a','h','c1'],{from:'Web server',to:'Your PC',n:3,of:4,type:'Resent',data:'photo.jpg · part 3 of 4',kind:'res'});
+    lost.resent=true;S().q1=true;finish({text:'All 4 packets are here. The PC puts them back in order: 1, 2, 3, 4. The photo is complete.',tone:'ok'});});
+  if(q2)q2.querySelectorAll('button').forEach(b=>b.onclick=()=>{if(b.dataset.a!=='b'){b.classList.add('wrong');setStatus('Not quite. Look at the routes the packets took across the internet.','bad');return;}
+    S().q2=true;complete('Yes. Packets take different routes, so they can arrive in any order. The packet numbers in the header let the PC put them back together.');});}
+async function runLost(){await begin();const s=S();lost.arrived=[];lost.resent=false;s.sent=false;s.q1=false;s.q2=false;renderMission();setStatus('The web server splits photo.jpg into 4 numbered packets and sends them…');
+  const routes={1:['ws','c','b','h','c1'],2:['ws','d','b','h','c1'],3:['ws','c','a','h','c1'],4:['ws','d','a','h','c1']};
+  await Promise.all([1,2,3,4].map(n=>travel(routes[n],{from:'Web server',to:'Your PC',n,of:4,type:'Web page',data:'photo.jpg · part '+n+' of 4',kind:'res'},(n-1)*300,{loseAt:n===3?1:undefined,speed:260}).then(r=>{if(r.ok){lost.arrived.push(n);renderMission({text:'Packet '+n+' arrived.'});}})));
+  s.sent=true;finish({text:'Packets arrived in the order '+lost.arrived.join(', ')+'. One packet is missing.',tone:'bad'});}
+
+renderAll();
+})();
+</script>
+
+</body>
+</html>
