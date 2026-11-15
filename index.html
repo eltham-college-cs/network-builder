@@ -79,6 +79,9 @@ nav.tabs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;pad
 .tab .n{position:relative}
 .tab.fresh{animation:unlock .8s cubic-bezier(.3,1.6,.5,1)}
 @keyframes unlock{0%{transform:scale(.9) rotate(-3deg)}40%{transform:scale(1.08) rotate(2deg)}100%{transform:none}}
+.bonus{display:inline-block;text-decoration:none;margin-top:10px}
+.bonuslink{justify-self:start;display:inline-block;text-decoration:none;font:800 14px var(--body);color:#1B2440;background:var(--sun);border:3px solid var(--outline);border-radius:999px;padding:4px 14px;box-shadow:2px 2px 0 var(--outline);animation:pop .55s cubic-bezier(.3,1.6,.5,1)}
+.bonuslink:hover{transform:translateY(-1px)}
 .codeword .next{margin-top:12px;background:var(--panel);font-size:16px}
 .tab:focus-visible,button:focus-visible{outline:4px solid var(--berry);outline-offset:3px}
 
@@ -237,6 +240,7 @@ body.demo #inspcard.show{display:block}
   </div>
   <div class="hud">
     <div class="prog"><span>Missions</span><div class="bar" role="progressbar" aria-label="Missions complete" aria-valuemin="0" aria-valuemax="6" id="pbarwrap"><i id="pbar"></i></div><span id="pcount">0 / 6</span></div>
+    <a id="bonuslink" class="bonuslink" href="packet-snake/" target="_blank" rel="noopener" hidden>&#9733; Bonus game: Packet Snake</a>
     <div class="codes" id="codes" aria-live="polite">Code words: <span>none yet</span></div>
   </div>
 </div></header>
@@ -404,7 +408,7 @@ const unlocked=i=>TEACHER||i===0||!!MISSIONS[i].hw||!!state.done[i-1];
 function renderTabs(){if(DEMO)return;const t=$('tabs');t.innerHTML='';MISSIONS.forEach((m,i)=>{const b=document.createElement('button');const lk=!unlocked(i);b.className='tab'+(m.hw?' hw':'')+(state.done[i]?' done':'')+(lk?' locked':'')+(state.justUnlocked===i?' fresh':'');if(lk){b.setAttribute('aria-disabled','true');b.title='Finish Mission '+i+' to unlock';}b.setAttribute('role','tab');b.setAttribute('aria-selected',i===state.m);
   b.innerHTML='<span class="n">'+(m.hw?'H':i+1)+'</span><span class="t">'+m.short+'</span><span class="st" aria-label="'+m.stars+' stars">'+'★'.repeat(m.stars)+'</span>';b.setAttribute('aria-label',(m.hw?'Homework mission':'Mission '+(i+1))+': '+m.short+(state.done[i]?' (done)':lk?' (locked)':''));b.onclick=()=>{if(state.busy)return;if(!unlocked(i)){setStatus('Mission '+(i+1)+' is locked. Finish Mission '+i+' first to unlock it.','bad');return;}state.m=i;state.pending=null;renderAll();};t.appendChild(b);});state.justUnlocked=null;
   const words=MISSIONS.map((m,i)=>state.done[i]?'<b>'+(m.hw?'H':i+1)+' '+m.code+'</b>':'').filter(Boolean);
-  $('codes').innerHTML='Code words: '+(words.length?words.join(''):'<span>none yet</span>');const nd=MISSIONS.filter((m,i)=>!m.hw&&state.done[i]).length;$('pcount').textContent=nd+' / 6';$('pbar').style.width=(nd/6*100)+'%';$('pbarwrap').setAttribute('aria-valuenow',nd);}
+  $('codes').innerHTML='Code words: '+(words.length?words.join(''):'<span>none yet</span>');const nd=MISSIONS.filter((m,i)=>!m.hw&&state.done[i]).length;$('pcount').textContent=nd+' / 6';const bl=$('bonuslink');if(bl)bl.hidden=nd<6;$('pbar').style.width=(nd/6*100)+'%';$('pbarwrap').setAttribute('aria-valuenow',nd);}
 function renderMission(msg){if(DEMO)return renderDemo(msg);
   const m=M(),s=S(),box=$('mission');
   const checks=m.checks.map(([label,fn,bonus])=>{let ok=false;try{ok=!!fn(s);}catch(e){}return'<li class="'+(ok?'ok':'')+'"><span class="b">'+(ok?'✓':'')+'</span><span>'+label+'</span></li>';}).join('');
@@ -418,7 +422,7 @@ function renderMission(msg){if(DEMO)return renderDemo(msg);
   h+='</div>';
   if(state.m===5)h+=lostPanel();
   h+='<div class="status '+(msg&&msg.tone||'')+'" id="status">'+(msg?msg.text:defaultTip())+'</div>';
-  if(state.done[state.m])h+='<div class="codeword"><small>Mission complete! Write this code word in your book</small><div class="w">'+m.code+'</div>'+(state.m<5?'<button class="btn primary next" id="next">Next: Mission '+(state.m+2)+' ▶</button>':m.hw?'<small style="margin-top:8px">Press Save picture and hand in the picture with your homework.</small>':'<small style="margin-top:8px">All six missions done. Brilliant work!</small>')+'</div>';
+  if(state.done[state.m])h+='<div class="codeword"><small>Mission complete! Write this code word in your book</small><div class="w">'+m.code+'</div>'+(state.m<5?'<button class="btn primary next" id="next">Next: Mission '+(state.m+2)+' ▶</button>':m.hw?'<small style="margin-top:8px">Press Save picture and hand in the picture with your homework.</small>':'<small style="margin-top:8px">All six missions done. Brilliant work!</small><a class="btn primary next bonus" href="packet-snake/" target="_blank" rel="noopener">Bonus game: Packet Snake &#9654;</a>')+'</div>';
   if(m.hw)h+='<div class="hwnote">Doing this at home? This mission is always unlocked, on any computer. Go to <b>eltham-college-cs.github.io/network-builder/#homework</b></div>';
   box.innerHTML=h;
   if($('snap'))$('snap').onclick=savePicture;
