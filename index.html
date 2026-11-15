@@ -152,7 +152,9 @@ svg#net{display:block;width:100%;height:auto;user-select:none;-webkit-user-selec
 .dev.sel .halo{stroke:var(--berry);animation:spin 4s linear infinite;transform-origin:center}
 @keyframes spin{to{stroke-dashoffset:-56}}
 .dev .hit{fill:transparent}
-.dev.flash{animation:bounce .45s cubic-bezier(.3,1.6,.5,1)}
+/* animate an inner group: a CSS transform on the outer <g> would replace its translate() position */
+.dev .ico{transform-box:fill-box;transform-origin:center}
+.dev.flash .ico{animation:bounce .45s cubic-bezier(.3,1.6,.5,1)}
 .dev.flash .ic-body{stroke:var(--ok);stroke-width:5}
 @keyframes bounce{40%{transform:scale(1.12)}}
 .ghost rect{fill:var(--sun-soft);stroke:var(--sun);stroke-width:3;stroke-dasharray:8 6;opacity:.9}
@@ -452,7 +454,7 @@ function renderCanvas(){const s=S();
   const dl=$('devLayer');dl.innerHTML='';
   s.devices.forEach(d=>{const gg=el('g',{class:'dev'+(d.locked?' locked':'')+(state.pending===d.id?' sel':''),'data-dev':d.id,'data-type':d.type,transform:'translate('+d.x+','+d.y+')'});
     gg.appendChild(el('circle',{class:'halo',r:50}));gg.appendChild(el('rect',{class:'hit',x:-44,y:-40,width:88,height:100}));
-    gg.insertAdjacentHTML('beforeend',icon(d.type));gg.appendChild(el('text',{y:d.type==='internet'?44:50},d.label));dl.appendChild(gg);});}
+    gg.insertAdjacentHTML('beforeend','<g class="ico">'+icon(d.type)+'</g>');gg.appendChild(el('text',{y:d.type==='internet'?44:50},d.label));dl.appendChild(gg);});}
 function renderAll(msg){renderTabs();renderPalette();renderCanvas();renderMission(msg);}
 
 /* ---------- editing ---------- */
